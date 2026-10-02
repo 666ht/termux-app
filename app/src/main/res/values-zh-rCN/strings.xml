@@ -25,7 +25,7 @@
     <string name="bootstrap_error_not_primary_user_message">Termux 只能由主要用户运行。\n为 Termux 编译的引导程序二进制文件已将 $PREFIX 路径写死，不能安装到以下路径之外：\n%1$s。</string>
     <string name="bootstrap_error_installed_on_portable_sd">Termux 无法安装到设备上的可移动/外部/便携式 SD 卡。\n为 Termux 编译的引导程序二进制文件已将 $PREFIX 路径写死，不能安装到以下路径之外：\n%1$s。</string>
     <string name="action_new_session">新建会话</string>
-    <string name="action_new_session_failsafe">安全模式</string>
+    <string name="action_new_session_failsafe">故障安全模式</string>
     <string name="title_max_terminals_reached">已达到最大终端数量</string>
     <string name="msg_max_terminals_reached">创建新终端前，请先关闭已有终端。</string>
     <string name="title_rename_session">设置会话名称</string>
