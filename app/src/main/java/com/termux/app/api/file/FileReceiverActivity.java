@@ -90,13 +90,13 @@ public class FileReceiverActivity extends AppCompatActivity {
                     promptNameAndSave(new ByteArrayInputStream(sharedText.getBytes(StandardCharsets.UTF_8)), subject);
                 }
             } else {
-                showErrorDialogAndQuit("Send action without content - nothing to save.");
+                showErrorDialogAndQuit("发送操作没有附带内容，无法保存。");
             }
         } else {
             Uri dataUri = intent.getData();
 
             if (dataUri == null) {
-                showErrorDialogAndQuit("Data uri not passed.");
+                showErrorDialogAndQuit("未传入数据 URI。");
                 return;
             }
 
@@ -108,7 +108,7 @@ public class FileReceiverActivity extends AppCompatActivity {
                 // Get full path including fragment (anything after last "#")
                 String path = UriUtils.getUriFilePathWithFragment(dataUri);
                 if (DataUtils.isNullOrEmpty(path)) {
-                    showErrorDialogAndQuit("File path from data uri is null, empty or invalid.");
+                    showErrorDialogAndQuit("数据 URI 中的文件路径为空、无效或不存在。");
                     return;
                 }
 
@@ -117,10 +117,10 @@ public class FileReceiverActivity extends AppCompatActivity {
                     FileInputStream in = new FileInputStream(file);
                     promptNameAndSave(in, file.getName());
                 } catch (FileNotFoundException e) {
-                    showErrorDialogAndQuit("Cannot open file: " + e.getMessage() + ".");
+                    showErrorDialogAndQuit("无法打开文件：" + e.getMessage() + "。");
                 }
             } else {
-                showErrorDialogAndQuit("Unable to receive any file or URL.");
+                showErrorDialogAndQuit("无法接收文件或网址。");
             }
         }
     }
@@ -154,7 +154,7 @@ public class FileReceiverActivity extends AppCompatActivity {
             InputStream in = getContentResolver().openInputStream(uri);
             promptNameAndSave(in, attachmentFileName);
         } catch (Exception e) {
-            showErrorDialogAndQuit("Unable to handle shared content:\n\n" + e.getMessage());
+            showErrorDialogAndQuit("无法处理共享内容：\n\n" + e.getMessage());
             Logger.logStackTraceWithMessage(LOG_TAG, "handleContentUri(uri=" + uri + ") failed", e);
         }
     }
@@ -167,8 +167,8 @@ public class FileReceiverActivity extends AppCompatActivity {
 
                 final File editorProgramFile = new File(EDITOR_PROGRAM);
                 if (!editorProgramFile.isFile()) {
-                    showErrorDialogAndQuit("The following file does not exist:\n$HOME/bin/termux-file-editor\n\n"
-                        + "Create this file as a script or a symlink - it will be called with the received file as only argument.");
+                    showErrorDialogAndQuit("以下文件不存在：\n$HOME/bin/termux-file-editor\n\n"
+                        + "请将此文件创建为脚本或符号链接；Termux 会以接收到的文件作为唯一参数调用它。");
                     return;
                 }
 
@@ -193,7 +193,7 @@ public class FileReceiverActivity extends AppCompatActivity {
                 startService(executeIntent);
                 finish();
             },
-            android.R.string.cancel, text -> finish(), dialog -> {
+            com.termux.shared.R.string.action_cancel, text -> finish(), dialog -> {
                 if (mFinishOnDismissNameDialog) finish();
             });
     }
@@ -202,12 +202,12 @@ public class FileReceiverActivity extends AppCompatActivity {
         File receiveDir = new File(TERMUX_RECEIVEDIR);
 
         if (DataUtils.isNullOrEmpty(attachmentFileName)) {
-            showErrorDialogAndQuit("File name cannot be null or empty");
+            showErrorDialogAndQuit("文件名不能为空。");
             return null;
         }
 
         if (!receiveDir.isDirectory() && !receiveDir.mkdirs()) {
-            showErrorDialogAndQuit("Cannot create directory: " + receiveDir.getAbsolutePath());
+            showErrorDialogAndQuit("无法创建目录：" + receiveDir.getAbsolutePath());
             return null;
         }
 
@@ -222,7 +222,7 @@ public class FileReceiverActivity extends AppCompatActivity {
             }
             return outFile;
         } catch (IOException e) {
-            showErrorDialogAndQuit("Error saving file:\n\n" + e);
+            showErrorDialogAndQuit("保存文件时出错：\n\n" + e);
             Logger.logStackTraceWithMessage(LOG_TAG, "Error saving file", e);
             return null;
         }
@@ -231,8 +231,8 @@ public class FileReceiverActivity extends AppCompatActivity {
     void handleUrlAndFinish(final String url) {
         final File urlOpenerProgramFile = new File(URL_OPENER_PROGRAM);
         if (!urlOpenerProgramFile.isFile()) {
-            showErrorDialogAndQuit("The following file does not exist:\n$HOME/bin/termux-url-opener\n\n"
-                + "Create this file as a script or a symlink - it will be called with the shared URL as the first argument.");
+            showErrorDialogAndQuit("以下文件不存在：\n$HOME/bin/termux-url-opener\n\n"
+                + "请将此文件创建为脚本或符号链接；Termux 会以共享的网址作为第一个参数调用它。");
             return;
         }
 
