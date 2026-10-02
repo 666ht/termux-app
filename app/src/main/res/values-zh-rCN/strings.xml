@@ -17,6 +17,7 @@
     <string name="shared_user_label">&TERMUX_APP_NAME; 用户</string>
 
     <!-- Termux RUN_COMMAND permission -->
+    <!-- 中文界面构建版本 -->
     <string name="permission_run_command_label">在 &TERMUX_APP_NAME; 环境中运行命令</string>
     <string name="permission_run_command_description">在 &TERMUX_APP_NAME; 环境中执行任意命令并访问文件</string>
 
