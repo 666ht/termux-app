@@ -104,6 +104,7 @@
 
     <!-- Miscellaneous -->
     <string name="action_yes">Yes</string>
+    <string name="action_ok">OK</string>
     <string name="action_no">No</string>
     <string name="action_copy">Copy</string>
     <string name="action_share">Share</string>
