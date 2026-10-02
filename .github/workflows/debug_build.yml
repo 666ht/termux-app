@@ -70,3 +70,5 @@ jobs:
             ${{ env.APK_DIR_PATH }}/*.apk
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_sha256sums
           if-no-files-found: error
+
+# Trigger a fresh APK build after the Chinese runtime localization fix.
