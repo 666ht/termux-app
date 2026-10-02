@@ -244,9 +244,9 @@ task localizeBootstrapRuntimeOutput() {
 
 # Translate user-visible bootstrap messages to Simplified Chinese while
 # preserving package names, commands, paths, library names and variables.
-LOG_FILE="${TMPDIR:-/data/data/com.termux/files/usr/tmp}/termux-bootstrap-second-stage.log"
+LOG_FILE="${TMPDIR:-${PREFIX:-/data/data/com.termux/files/usr}/tmp}/termux-bootstrap-second-stage.log"
 
-"/data/data/com.termux/files/usr/bin/bash" "/data/data/com.termux/files/usr/etc/termux/bootstrap/termux-bootstrap-second-stage.sh" >"$LOG_FILE" 2>&1
+"${PREFIX:-/data/data/com.termux/files/usr}/bin/bash" "${PREFIX:-/data/data/com.termux/files/usr}/etc/termux/bootstrap/termux-bootstrap-second-stage.sh" >"$LOG_FILE" 2>&1
 status=$?
 
 while IFS= read -r line; do
@@ -257,9 +257,8 @@ while IFS= read -r line; do
             echo "[*] 正在运行 Termux 引导程序第二阶段" ;;
         "[*] Running postinst maintainer scripts")
             echo "[*] 正在运行安装后维护脚本" ;;
-        "[*] Running '"*"'" package postinst)
-            pkg=${line#"[ *] Running '"}
-            pkg=${pkg%%"' package postinst"*}
+        "[*] Running '"*"' package postinst")
+            pkg=$(printf '%s\\n' "$line" | sed -n "s/^\\[\\*\\] Running '\\(.*\\)' package postinst$/\\1/p")
             echo "[*] 正在运行 '$pkg' 软件包安装后脚本" ;;
         "update-alternatives: using "*)
             echo "$line" | sed 's/^update-alternatives: using /正在使用 /; s/ to provide / 提供 /; s/ in auto mode/，当前为自动模式/; s/ in manual mode/，当前为手动模式/' ;;
