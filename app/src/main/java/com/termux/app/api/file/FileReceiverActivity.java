@@ -128,7 +128,7 @@ public class FileReceiverActivity extends AppCompatActivity {
     void showErrorDialogAndQuit(String message) {
         mFinishOnDismissNameDialog = false;
         MessageDialogUtils.showMessage(this,
-            API_TAG, message,
+            getString(R.string.title_file_receiver_error), message,
             null, (dialog, which) -> finish(),
             null, null,
             dialog -> finish());
