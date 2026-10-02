@@ -716,11 +716,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         final AlertDialog.Builder b = new AlertDialog.Builder(this);
         b.setIcon(android.R.drawable.ic_dialog_alert);
         b.setMessage(R.string.title_confirm_kill_process);
-        b.setPositiveButton(android.R.string.yes, (dialog, id) -> {
+        b.setPositiveButton(com.termux.shared.R.string.action_yes, (dialog, id) -> {
             dialog.dismiss();
             session.finishIfRunning();
         });
-        b.setNegativeButton(android.R.string.no, null);
+        b.setNegativeButton(com.termux.shared.R.string.action_no, null);
         b.show();
     }
 
@@ -745,7 +745,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             new AlertDialog.Builder(this).setMessage(getString(R.string.error_styling_not_installed))
                 .setPositiveButton(R.string.action_styling_install,
                     (dialog, which) -> ActivityUtils.startActivity(this, new Intent(Intent.ACTION_VIEW, Uri.parse(TermuxConstants.TERMUX_STYLING_FDROID_PACKAGE_URL))))
-                .setNegativeButton(android.R.string.cancel, null).show();
+                .setNegativeButton(com.termux.shared.R.string.action_cancel, null).show();
         }
     }
     private void toggleKeepScreenOn() {
