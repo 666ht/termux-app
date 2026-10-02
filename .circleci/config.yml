@@ -34,7 +34,7 @@ jobs:
           name: Build << parameters.package_variant >> APKs
           command: |
             set -e
-            CURRENT_VERSION_NAME=$(grep -m 1 -E '\\s+versionName "([^"]+)"$' ./app/build.gradle | sed -r 's/\\s+versionName "([^"]+)"$/\\1/')
+            CURRENT_VERSION_NAME=$(grep -m 1 -E '\s+versionName "([^"]+)"$' ./app/build.gradle | sed -r 's/\s+versionName "([^"]+)"$/\1/')
             RELEASE_VERSION_NAME="v${CURRENT_VERSION_NAME}+${CIRCLE_SHA1:0:7}"
             export TERMUX_APP_VERSION_NAME="${RELEASE_VERSION_NAME#v}"
             export TERMUX_APK_VERSION_TAG="${RELEASE_VERSION_NAME}-<< parameters.package_variant >>-circleci"
