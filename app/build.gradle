@@ -236,8 +236,97 @@ task downloadBootstraps() {
     }
 }
 
+
+task localizeBootstrapRuntimeOutput() {
+    dependsOn(downloadBootstraps)
+    doLast {
+        def fallbackScript = '''#!/data/data/com.termux/files/usr/bin/sh
+
+# Translate user-visible bootstrap messages to Simplified Chinese while
+# preserving package names, commands, paths, library names and variables.
+LOG_FILE="${TMPDIR:-/data/data/com.termux/files/usr/tmp}/termux-bootstrap-second-stage.log"
+
+"/data/data/com.termux/files/usr/bin/bash" "/data/data/com.termux/files/usr/etc/termux/bootstrap/termux-bootstrap-second-stage.sh" >"$LOG_FILE" 2>&1
+status=$?
+
+while IFS= read -r line; do
+    case "$line" in
+        "Starting fallback run of termux bootstrap second stage")
+            echo "[*] 正在启动 Termux 引导程序第二阶段（备用模式）" ;;
+        "[*] Running termux bootstrap second stage")
+            echo "[*] 正在运行 Termux 引导程序第二阶段" ;;
+        "[*] Running postinst maintainer scripts")
+            echo "[*] 正在运行安装后维护脚本" ;;
+        "[*] Running '"*"'" package postinst)
+            pkg=${line#"[ *] Running '"}
+            pkg=${pkg%%"' package postinst"*}
+            echo "[*] 正在运行 '$pkg' 软件包安装后脚本" ;;
+        "update-alternatives: using "*)
+            echo "$line" | sed 's/^update-alternatives: using /正在使用 /; s/ to provide / 提供 /; s/ in auto mode/，当前为自动模式/; s/ in manual mode/，当前为手动模式/' ;;
+        "update-alternatives: warning: skipping updating manpage database as "*)
+            echo "$line" | sed 's/^update-alternatives: warning: skipping updating manpage database as /警告：由于 /; s/ is not installed/ 未安装，跳过更新手册页数据库/' ;;
+        "termux-exec.postinst: Start")
+            echo "termux-exec.postinst：开始" ;;
+        "termux-exec.postinst: End")
+            echo "termux-exec.postinst：结束" ;;
+        "termux-exec.postinst: android_build_version_sdk: "*)
+            echo "$line" | sed "s/^termux-exec.postinst: android_build_version_sdk: /termux-exec.postinst：Android 构建版本 SDK：/" ;;
+        "termux-exec: Setting primary Termux "*)
+            echo "$line" | sed 's/^termux-exec: Setting primary Termux /termux-exec：正在设置 Termux 的主要 /; s/ library in / 库：/; s/ to / → /' ;;
+        "termux-exec.postinst: Failed to get android_build_version_sdk value from "*)
+            echo "$line" | sed "s/^termux-exec.postinst: /termux-exec.postinst：/" ;;
+        "termux-exec.postinst: Skipping setting primary Termux "*)
+            echo "$line" | sed "s/^termux-exec.postinst: /termux-exec.postinst：/" ;;
+        "[*] The termux bootstrap second stage completed successfully")
+            echo "[*] Termux 引导程序第二阶段已成功完成" ;;
+        "[*] Finished.")
+            echo "[*] 已完成。" ;;
+        "Get:"*)
+            echo "$line" | sed 's/^Get:/获取：/' ;;
+        "Ign:"*)
+            echo "$line" | sed 's/^Ign:/忽略：/' ;;
+        "Err:"*)
+            echo "$line" | sed 's/^Err:/错误：/' ;;
+        "Fetched "*)
+            echo "$line" | sed 's/^Fetched /已获取 /' ;;
+        "Reading package lists..."*)
+            echo "$line" | sed 's/^Reading package lists/正在读取软件包列表/' ;;
+        "Building dependency tree..."*)
+            echo "$line" | sed 's/^Building dependency tree/正在构建依赖关系树/' ;;
+        "Reading state information..."*)
+            echo "$line" | sed 's/^Reading state information/正在读取状态信息/' ;;
+        *)
+            echo "$line" ;;
+    esac
+done <"$LOG_FILE"
+
+rm -f "$LOG_FILE"
+exit $status
+'''
+        def patchBootstrap = { File archive ->
+            def tempDir = new File(project.buildDir, "bootstrap-runtime-localization")
+            delete tempDir
+            def scriptFile = new File(tempDir, "etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh")
+            scriptFile.parentFile.mkdirs()
+            scriptFile.text = fallbackScript
+            project.exec {
+                workingDir tempDir
+                commandLine "chmod", "600", scriptFile
+            }
+            project.exec {
+                workingDir tempDir
+                commandLine "zip", "-q", archive.absolutePath, "etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh"
+            }
+            delete tempDir
+        }
+        fileTree(new File(projectDir, "src/main/cpp")) {
+            include "bootstrap-*.zip"
+        }.each { patchBootstrap(it) }
+    }
+}
+
 afterEvaluate {
     android.applicationVariants.all { variant ->
-        variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
+        variant.javaCompileProvider.get().dependsOn(localizeBootstrapRuntimeOutput)
     }
 }
