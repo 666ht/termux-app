@@ -132,3 +132,5 @@ jobs:
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_sha256sums
             ${{ env.APK_DIR_PATH }}/output-metadata.json
+
+# Chinese APK build trigger 2026-10-02T04:37:48.069Z
