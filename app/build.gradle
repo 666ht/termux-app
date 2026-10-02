@@ -300,6 +300,9 @@ while IFS= read -r line; do
 done <"$LOG_FILE"
 
 rm -f "$LOG_FILE"
+# The fallback is a one-time first-start bootstrap trigger. Remove it after
+# execution so later shell startups do not rerun the bootstrap stage.
+rm -f "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh"
 exit $status
 '''
         def patchBootstrap = { File archive ->
