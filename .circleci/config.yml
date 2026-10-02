@@ -1,0 +1,85 @@
+version: 2.1
+
+parameters:
+  package_variant:
+    type: string
+    default: apt-android-7
+
+jobs:
+  build:
+    docker:
+      - image: cimg/android:2026.08
+    resource_class: large
+    environment:
+      TERMUX_PACKAGE_VARIANT: << parameters.package_variant >>
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - termux-gradle-v1-{{ arch }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}-{{ checksum "app/build.gradle" }}
+            - termux-gradle-v1-{{ arch }}-
+
+      - run:
+          name: Check Java and Android environment
+          command: |
+            java -version
+            ./gradlew --version
+
+      - run:
+          name: Build << parameters.package_variant >> APKs
+          command: |
+            set -e
+            CURRENT_VERSION_NAME=$(grep -m 1 -E '\\s+versionName "([^"]+)"$' ./app/build.gradle | sed -r 's/\\s+versionName "([^"]+)"$/\\1/')
+            RELEASE_VERSION_NAME="v${CURRENT_VERSION_NAME}+${CIRCLE_SHA1:0:7}"
+            export TERMUX_APP_VERSION_NAME="${RELEASE_VERSION_NAME#v}"
+            export TERMUX_APK_VERSION_TAG="${RELEASE_VERSION_NAME}-<< parameters.package_variant >>-circleci"
+            export TERMUX_PACKAGE_VARIANT="<< parameters.package_variant >>"
+            ./gradlew assembleDebug --no-daemon
+
+            APK_DIR_PATH="./app/build/outputs/apk/debug"
+            APK_BASENAME_PREFIX="termux-app_${TERMUX_APK_VERSION_TAG}"
+
+            for abi in universal arm64-v8a armeabi-v7a x86_64 x86; do
+              test -f "${APK_DIR_PATH}/${APK_BASENAME_PREFIX}_${abi}.apk"
+            done
+
+            (
+              cd "${APK_DIR_PATH}"
+              sha256sum \
+                "${APK_BASENAME_PREFIX}_universal.apk" \
+                "${APK_BASENAME_PREFIX}_arm64-v8a.apk" \
+                "${APK_BASENAME_PREFIX}_armeabi-v7a.apk" \
+                "${APK_BASENAME_PREFIX}_x86_64.apk" \
+                "${APK_BASENAME_PREFIX}_x86.apk" \
+                > "${APK_BASENAME_PREFIX}_sha256sums"
+            )
+
+            echo "export APK_DIR_PATH=${APK_DIR_PATH}" >> "$BASH_ENV"
+            echo "export APK_BASENAME_PREFIX=${APK_BASENAME_PREFIX}" >> "$BASH_ENV"
+
+      - save_cache:
+          key: termux-gradle-v1-{{ arch }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}-{{ checksum "app/build.gradle" }}
+          paths:
+            - ~/.gradle/caches
+            - ~/.gradle/wrapper
+
+      - run:
+          name: List APK outputs
+          command: |
+            source "$BASH_ENV"
+            ls -lh "${APK_DIR_PATH}"
+
+      - store_artifacts:
+          path: app/build/outputs/apk/debug
+          destination: apk-<< parameters.package_variant >>
+
+workflows:
+  build:
+    jobs:
+      - build:
+          name: build-apt-android-7
+          package_variant: apt-android-7
+      - build:
+          name: build-apt-android-5
+          package_variant: apt-android-5
