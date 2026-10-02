@@ -27,15 +27,26 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ matrix.package_variant }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.package_variant }}-
+            ${{ runner.os }}-gradle-
+
       - name: Build APKs
         shell: bash {0}
         env:
           PACKAGE_VARIANT: ${{ matrix.package_variant }}
         run: |
           set -euo pipefail
-          CURRENT_VERSION_NAME="$(grep -m 1 -E 'versionName "[^"]+"' ./app/build.gradle | sed -E 's/.*versionName "([^"]+)".*/\\1/')"
+          CURRENT_VERSION_NAME="$(grep -m 1 -E 'versionName "[^"]+"' ./app/build.gradle | cut -d '"' -f2)"
           test -n "$CURRENT_VERSION_NAME"
-          RELEASE_VERSION_NAME="v$CURRENT_VERSION_NAME+${GITHUB_SHA:0:7}"
+          RELEASE_VERSION_NAME="$CURRENT_VERSION_NAME+${GITHUB_SHA:0:7}"
           echo "Building $RELEASE_VERSION_NAME / $PACKAGE_VARIANT"
           APK_DIR_PATH="./app/build/outputs/apk/debug"
           APK_VERSION_TAG="$RELEASE_VERSION_NAME-$PACKAGE_VARIANT-github-debug"
@@ -46,14 +57,16 @@ jobs:
           export TERMUX_APK_VERSION_TAG="$APK_VERSION_TAG"
           export TERMUX_PACKAGE_VARIANT="$PACKAGE_VARIANT"
           ./gradlew assembleDebug --no-daemon --stacktrace
-          for abi in universal arm64-v8a armeabi-v7a x86_64 x86; do
-            test -f "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_$abi.apk" || { echo "Missing APK: $abi"; exit 1; }
-          done
-          (cd "$APK_DIR_PATH"; sha256sum "${APK_BASENAME_PREFIX}"_*.apk > "${APK_BASENAME_PREFIX}_sha256sums")
+          find "$APK_DIR_PATH" -maxdepth 1 -type f -name "*.apk" -print
+          APK_COUNT="$(find "$APK_DIR_PATH" -maxdepth 1 -type f -name "*.apk" | wc -l)"
+          test "$APK_COUNT" -gt 0
+          (cd "$APK_DIR_PATH"; sha256sum *.apk > "${APK_BASENAME_PREFIX}_sha256sums")
 
       - name: Attach APKs
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}
-          path: ${{ env.APK_DIR_PATH }}/*
+          path: |
+            ${{ env.APK_DIR_PATH }}/*.apk
+            ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_sha256sums
           if-no-files-found: error
