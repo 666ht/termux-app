@@ -29,9 +29,13 @@ jobs:
           command: |
             java -version
             ./gradlew --version
+            echo "Android SDK: $ANDROID_HOME"
+            echo "Android NDK: $ANDROID_NDK_HOME"
+            ls "$ANDROID_HOME/ndk/" 2>/dev/null || echo "No NDK directory found"
 
       - run:
           name: Build << parameters.package_variant >> APKs
+          no_output_timeout: 30m
           command: |
             set -e
             CURRENT_VERSION_NAME=$(grep -m 1 -E '\\s+versionName "([^"]+)"$' ./app/build.gradle | sed -r 's/\\s+versionName "([^"]+)"$/\\1/')
