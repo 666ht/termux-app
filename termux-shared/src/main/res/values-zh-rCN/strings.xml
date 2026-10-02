@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_ok">确定</string>
+    <string name="action_yes">是</string>
+    <string name="action_no">否</string>
+    <string name="action_cancel">取消</string>
+</resources>
