@@ -308,13 +308,19 @@ exit $status
             def scriptFile = new File(tempDir, "etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh")
             scriptFile.parentFile.mkdirs()
             scriptFile.text = fallbackScript
-            project.exec {
-                workingDir tempDir
-                commandLine "chmod", "600", scriptFile
+            def chmodProcess = new ProcessBuilder("chmod", "600", scriptFile.absolutePath)
+                    .directory(tempDir)
+                    .inheritIO()
+                    .start()
+            if (chmodProcess.waitFor() != 0) {
+                throw new GradleException("Failed to set permissions on bootstrap localization script")
             }
-            project.exec {
-                workingDir tempDir
-                commandLine "zip", "-q", archive.absolutePath, "etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh"
+            def zipProcess = new ProcessBuilder("zip", "-q", archive.absolutePath, "etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh")
+                    .directory(tempDir)
+                    .inheritIO()
+                    .start()
+            if (zipProcess.waitFor() != 0) {
+                throw new GradleException("Failed to patch bootstrap archive with Chinese runtime localization")
             }
             delete tempDir
         }
