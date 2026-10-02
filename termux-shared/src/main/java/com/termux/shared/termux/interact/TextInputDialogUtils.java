@@ -56,7 +56,7 @@ public final class TextInputDialogUtils {
         }
 
         if (onNegative == null) {
-            builder.setNegativeButton(android.R.string.cancel, null);
+            builder.setNegativeButton(com.termux.shared.R.string.action_cancel, null);
         } else {
             builder.setNegativeButton(negativeButtonText, (dialog, which) -> onNegative.onTextSet(input.getText().toString()));
         }
