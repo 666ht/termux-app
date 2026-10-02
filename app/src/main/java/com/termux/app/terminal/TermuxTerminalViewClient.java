@@ -733,7 +733,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
         final String transcriptText = ShellUtils.getTerminalSessionTranscriptText(session, false, true);
         if (transcriptText == null) return;
 
-        MessageDialogUtils.showMessage(mActivity, TermuxConstants.TERMUX_APP_NAME + " Report Issue",
+        MessageDialogUtils.showMessage(mActivity, mActivity.getString(R.string.action_report_issue),
             mActivity.getString(R.string.msg_add_termux_debug_info),
             mActivity.getString(com.termux.shared.R.string.action_yes), (dialog, which) -> reportIssueFromTranscript(transcriptText, true),
             mActivity.getString(com.termux.shared.R.string.action_no), (dialog, which) -> reportIssueFromTranscript(transcriptText, false),
