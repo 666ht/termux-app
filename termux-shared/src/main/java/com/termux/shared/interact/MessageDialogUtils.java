@@ -68,7 +68,7 @@ public class MessageDialogUtils {
         }
 
         if (positiveText == null)
-            positiveText = context.getString(android.R.string.ok);
+            positiveText = context.getString(com.termux.shared.R.string.action_ok);
         builder.setPositiveButton(positiveText, onPositiveButton);
 
         if (negativeText != null)
