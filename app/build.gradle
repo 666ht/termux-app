@@ -10,6 +10,8 @@ ext {
     // by replacing $PREFIX since app code is dependant on the variant used to build the APK.
     // Currently supported values are: [ "apt-android-7" "apt-android-5" ]
     packageVariant = System.getenv("TERMUX_PACKAGE_VARIANT") ?: "apt-android-7" // Default: "apt-android-7"
+    // Unique package ID lets the localized build coexist with the official Termux app.
+    termuxApplicationId = System.getenv("TERMUX_APP_PACKAGE_NAME") ?: "com.termux.zhcn"
 }
 
 android {
@@ -51,8 +53,8 @@ android {
 
         buildConfigField "String", "TERMUX_PACKAGE_VARIANT", "\"" + project.ext.packageVariant + "\"" // Used by TermuxApplication class
 
-        manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.termux"
-        manifestPlaceholders.TERMUX_APP_NAME = "Termux"
+        manifestPlaceholders.TERMUX_PACKAGE_NAME = termuxApplicationId
+        manifestPlaceholders.TERMUX_APP_NAME = "Termux 中文"
         manifestPlaceholders.TERMUX_API_APP_NAME = "Termux:API"
         manifestPlaceholders.TERMUX_BOOT_APP_NAME = "Termux:Boot"
         manifestPlaceholders.TERMUX_FLOAT_APP_NAME = "Termux:Float"
@@ -71,7 +73,7 @@ android {
                 enable ((gradle.startParameter.taskNames.any { it.contains("Debug") } && splitAPKsForDebugBuilds == "1") ||
                     (gradle.startParameter.taskNames.any { it.contains("Release") } && splitAPKsForReleaseBuilds == "1"))
                 reset ()
-                include 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+                include 'arm64-v8a'
                 universalApk true
             }
         }
@@ -217,6 +219,14 @@ clean {
 
 task downloadBootstraps() {
     doLast {
+        if (System.getenv("TERMUX_CUSTOM_BOOTSTRAP") == "1") {
+            def customBootstrap = new File(projectDir, "src/main/cpp/bootstrap-aarch64.zip")
+            if (!customBootstrap.isFile() || customBootstrap.length() == 0) {
+                throw new GradleException("Custom coexisting bootstrap is missing: " + customBootstrap)
+            }
+            logger.lifecycle("Using custom-prefix bootstrap: " + customBootstrap)
+            return
+        }
         def packageVariant = project.ext.packageVariant
         if (packageVariant == "apt-android-7") {
             def version = "2026.02.12-r1" + "%2B" + "apt.android-7"
