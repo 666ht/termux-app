@@ -36,7 +36,9 @@ jobs:
           # Build the bootstrap with the new Android app data path; the stock bootstrap
           # hardcodes /data/data/com.termux and will not work in a parallel install.
           sed -i 's/^TERMUX_APP__PACKAGE_NAME="com.termux"$/TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"/' scripts/properties.sh
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64 -f
+          # Fresh GitHub runners have no package cache; avoid -f because current upstream
+          # build-bootstraps uses an unset per-arch cache path in its forced-clean branch.
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64
           test -s bootstrap-aarch64.zip
           unzip -t bootstrap-aarch64.zip
           install -D -m 0644 bootstrap-aarch64.zip "$GITHUB_WORKSPACE/app/src/main/cpp/bootstrap-aarch64.zip"
