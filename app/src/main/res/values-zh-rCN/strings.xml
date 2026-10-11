@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<string name="application_name">Termux</string>
-<string name="shared_user_label">Termux 用户</string>
+<string name="application_name">Termux 中文</string>
+<string name="shared_user_label">Termux 中文用户</string>
 <string name="permission_run_command_label">在 Termux 环境中运行命令</string>
 <string name="permission_run_command_description">在 Termux 环境中执行任意命令并访问文件</string>
 <string name="bootstrap_installer_body">正在安装基础软件包…</string>
