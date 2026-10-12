@@ -32,6 +32,9 @@ jobs:
         run: |
           set -euo pipefail
           cd termux-packages
+          # Upstream renamed the bootstrap bzip2 package to libbz2; keep the bootstrap list in sync.
+          grep -q 'PACKAGES+=("bzip2")' scripts/build-bootstraps.sh
+          sed -i 's/PACKAGES+=("bzip2")/PACKAGES+=("libbz2")/' scripts/build-bootstraps.sh
           grep -q '^TERMUX_APP__PACKAGE_NAME="com.termux"$' scripts/properties.sh
           # Build the bootstrap with the new Android app data path; the stock bootstrap
           # hardcodes /data/data/com.termux and will not work in a parallel install.
