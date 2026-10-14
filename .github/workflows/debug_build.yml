@@ -113,19 +113,35 @@ jobs:
           RELEASE_VERSION_NAME="$CURRENT_VERSION_NAME+${GITHUB_SHA:0:7}"
           APK_VERSION_TAG="$RELEASE_VERSION_NAME-apt-android-7-zhcn-github"
           APK_DIR_PATH="./app/build/outputs/apk/debug"
+          DIST_DIR_PATH="$GITHUB_WORKSPACE/dist"
           export TERMUX_APP_VERSION_NAME="$RELEASE_VERSION_NAME"
           export TERMUX_APK_VERSION_TAG="$APK_VERSION_TAG"
           export TERMUX_PACKAGE_VARIANT="apt-android-7"
           ./gradlew assembleDebug --no-daemon --stacktrace
-          test -s "$APK_DIR_PATH/termux-app_${APK_VERSION_TAG}_arm64-v8a.apk"
-          (cd "$APK_DIR_PATH" && sha256sum "termux-app_${APK_VERSION_TAG}_arm64-v8a.apk" > "termux-app_${APK_VERSION_TAG}_sha256sums")
 
-      - name: Upload installable APKs
+          # Fail the job unless the exact ARM64 APK exists and is non-empty.
+          APK_SOURCE="$APK_DIR_PATH/termux-app_${APK_VERSION_TAG}_arm64-v8a.apk"
+          if [[ ! -s "$APK_SOURCE" ]]; then
+            echo "ERROR: Expected ARM64 APK was not produced: $APK_SOURCE" >&2
+            echo "Actual APK outputs:" >&2
+            find ./app/build/outputs/apk -type f -name '*.apk' -print >&2 || true
+            exit 1
+          fi
+
+          # Stage a stable, easy-to-find filename for the single downloadable artifact.
+          mkdir -p "$DIST_DIR_PATH"
+          cp "$APK_SOURCE" "$DIST_DIR_PATH/termux-chinese-arm64.apk"
+          test -s "$DIST_DIR_PATH/termux-chinese-arm64.apk"
+          (cd "$DIST_DIR_PATH" && sha256sum termux-chinese-arm64.apk > SHA256SUMS.txt)
+          echo "Verified APK output: $DIST_DIR_PATH/termux-chinese-arm64.apk"
+          ls -lh "$DIST_DIR_PATH/termux-chinese-arm64.apk" "$DIST_DIR_PATH/SHA256SUMS.txt"
+
+      - name: Upload installable ARM64 APK
         uses: actions/upload-artifact@v6
         with:
-          name: termux-chinese-coexisting-${{ github.sha }}
+          name: termux-chinese-arm64-${{ github.sha }}
           path: |
-            app/build/outputs/apk/debug/termux-app_*_arm64-v8a.apk
-            app/build/outputs/apk/debug/termux-app_*_sha256sums
+            dist/termux-chinese-arm64.apk
+            dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
