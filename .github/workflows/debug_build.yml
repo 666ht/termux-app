@@ -86,8 +86,7 @@ jobs:
           export TERMUX_PACKAGE_VARIANT="apt-android-7"
           ./gradlew assembleDebug --no-daemon --stacktrace
           test -s "$APK_DIR_PATH/termux-app_${APK_VERSION_TAG}_arm64-v8a.apk"
-          test -s "$APK_DIR_PATH/termux-app_${APK_VERSION_TAG}_universal.apk"
-          (cd "$APK_DIR_PATH" && sha256sum "termux-app_${APK_VERSION_TAG}_arm64-v8a.apk" "termux-app_${APK_VERSION_TAG}_universal.apk" > "termux-app_${APK_VERSION_TAG}_sha256sums")
+          (cd "$APK_DIR_PATH" && sha256sum "termux-app_${APK_VERSION_TAG}_arm64-v8a.apk" > "termux-app_${APK_VERSION_TAG}_sha256sums")
 
       - name: Upload installable APKs
         uses: actions/upload-artifact@v6
@@ -95,7 +94,6 @@ jobs:
           name: termux-chinese-coexisting-${{ github.sha }}
           path: |
             app/build/outputs/apk/debug/termux-app_*_arm64-v8a.apk
-            app/build/outputs/apk/debug/termux-app_*_universal.apk
             app/build/outputs/apk/debug/termux-app_*_sha256sums
           if-no-files-found: error
           retention-days: 30
