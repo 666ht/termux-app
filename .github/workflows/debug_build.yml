@@ -25,7 +25,20 @@ jobs:
           ref: master
           path: termux-packages
 
+      - name: Get bootstrap source revision
+        id: bootstrap-source
+        shell: bash
+        run: echo "sha=$(git -C termux-packages rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache custom-prefix ARM64 bootstrap
+        id: bootstrap-cache
+        uses: actions/cache@v4
+        with:
+          path: app/src/main/cpp/bootstrap-aarch64.zip
+          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v1
+
       - name: Build bootstrap for the coexisting package ID
+        if: steps.bootstrap-cache.outputs.cache-hit != 'true'
         shell: bash
         env:
           TERMUX_DOCKER_EXEC_EXTRA_ARGS: --env TERMUX_APP_PACKAGE_NAME_OVERRIDE=com.termux.zhcn
@@ -62,11 +75,30 @@ jobs:
           unzip -t "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip"
           install -D -m 0644 "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip" "$GITHUB_WORKSPACE/app/src/main/cpp/bootstrap-aarch64.zip"
 
+      - name: Verify ARM64 bootstrap archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s app/src/main/cpp/bootstrap-aarch64.zip
+          unzip -t app/src/main/cpp/bootstrap-aarch64.zip
+
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
+
+      - name: Cache native ARM64 build intermediates
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/.cxx
+            app/build/intermediates/ndkBuild
+            app/build/intermediates/cxx
+          key: ${{ runner.os }}-arm64-native-${{ hashFiles('app/build.gradle', 'app/src/main/cpp/**', 'termux-shared/src/main/cpp/**', '**/Android.mk', '**/Application.mk') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-native-
 
       - name: Build Chinese coexisting APK
         shell: bash
