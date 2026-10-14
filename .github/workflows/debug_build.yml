@@ -14,7 +14,7 @@ permissions:
 # Avoid duplicate expensive bootstrap builds when several commits are pushed quickly.
 concurrency:
   group: termux-chinese-arm64-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -43,6 +43,8 @@ jobs:
         with:
           path: app/src/main/cpp/bootstrap-aarch64.zip
           key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v2
+          restore-keys: |
+            ${{ runner.os }}-bootstrap-aarch64-
 
       - name: Build bootstrap for the coexisting package ID
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
