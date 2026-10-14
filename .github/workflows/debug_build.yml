@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/src/main/cpp/bootstrap-aarch64.zip
-          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v1
+          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v2
 
       - name: Build bootstrap for the coexisting package ID
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
@@ -77,6 +77,35 @@ jobs:
 
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64
           test -s "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip"
+
+          # Bootstrap packages may include installed test suites that are not needed at runtime.
+          # Remove only libexec/installed-tests; preserve commands, libraries, configuration and docs.
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import os
+          import tempfile
+
+          archive = Path(os.environ["RUNNER_TEMP"]) / "bootstrap-output/bootstrap-aarch64.zip"
+          fd, temp_name = tempfile.mkstemp(suffix=".zip", dir=archive.parent)
+          os.close(fd)
+          removed = 0
+          try:
+              with ZipFile(archive, "r") as source, ZipFile(temp_name, "w", ZIP_DEFLATED, compresslevel=9) as target:
+                  for item in source.infolist():
+                      normalized = "/" + item.filename.strip("/") + "/"
+                      if "/libexec/installed-tests/" in normalized:
+                          removed += 1
+                          continue
+                      target.writestr(item, source.read(item.filename))
+              os.replace(temp_name, archive)
+          finally:
+              if os.path.exists(temp_name):
+                  os.unlink(temp_name)
+          print(f"Removed {removed} non-runtime installed-test files")
+          print(f"Pruned bootstrap archive size: {archive.stat().st_size} bytes")
+          PY
+
           unzip -t "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip"
           install -D -m 0644 "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip" "$GITHUB_WORKSPACE/app/src/main/cpp/bootstrap-aarch64.zip"
 
