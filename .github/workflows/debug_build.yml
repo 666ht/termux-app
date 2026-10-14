@@ -14,7 +14,7 @@ permissions:
 # Avoid duplicate expensive bootstrap builds when several commits are pushed quickly.
 concurrency:
   group: termux-chinese-arm64-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
