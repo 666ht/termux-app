@@ -1,13 +1,15 @@
-name: Build Chinese Termux (coexisting package)
+name: Build Chinese Termux ARM64 APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - master
+  release:
+    types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 # Avoid duplicate expensive bootstrap builds when several commits are pushed quickly.
 concurrency:
@@ -179,3 +181,12 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Attach the same ARM64 APK to the published release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/termux-chinese-arm64.apk
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
