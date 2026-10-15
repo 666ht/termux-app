@@ -68,14 +68,14 @@ jobs:
           sed -i 's/^TERMUX_APP__PACKAGE_NAME="com.termux"$/TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"/' scripts/properties.sh
           grep -q '^TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"$' scripts/properties.sh
 
-          # The default X.Org endpoint repeatedly resets downloads on hosted runners.
-          # Use the public artfiles mirror; package SHA256 verification remains authoritative.
+          # Use X.Org's other primary download host instead of a partial third-party
+          # mirror. Keep package recipes' original SHA256 checks unchanged.
           python3 - <<'PY'
           from pathlib import Path
 
           replacements = (
-              ("https://xorg.freedesktop.org/archive/individual/", "https://artfiles.org/x.org/pub/individual/"),
-              ("https://xorg.freedesktop.org/releases/individual/", "https://artfiles.org/x.org/pub/individual/"),
+              ("https://xorg.freedesktop.org/archive/individual/", "https://www.x.org/releases/individual/"),
+              ("https://xorg.freedesktop.org/releases/individual/", "https://www.x.org/releases/individual/"),
           )
           changed = 0
           for recipe in Path("packages").rglob("build.sh"):
@@ -87,34 +87,17 @@ jobs:
                   recipe.write_text(updated)
                   changed += 1
 
-          for required_recipe in ("packages/libxdmcp/build.sh", "packages/xorg-util-macros/build.sh"):
-              content = Path(required_recipe).read_text()
-              if "https://artfiles.org/x.org/pub/individual/" not in content:
-                  raise SystemExit(f"X.Org mirror replacement did not apply to {required_recipe}")
-
-          # The mirrors above do not consistently carry the newest X.Org archives.
-          # xorgproto's canonical archive works; xtrans 1.6.0 is available from the
-          # xorg-lib mirror. Preserve the upstream SHA256 values for both downloads.
-          xorgproto_recipe = Path("packages/xorgproto/build.sh")
-          xorgproto_source = xorgproto_recipe.read_text()
-          artfiles_proto_url = "https://artfiles.org/x.org/pub/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
-          upstream_proto_url = "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
-          if artfiles_proto_url not in xorgproto_source:
-              raise SystemExit("Expected xorgproto artfiles URL was not found; refusing to continue with an unverified source URL.")
-          xorgproto_source = xorgproto_source.replace(artfiles_proto_url, upstream_proto_url, 1)
-          xorgproto_recipe.write_text(xorgproto_source)
-
-          xtrans_recipe = Path("packages/xtrans/build.sh")
-          xtrans_source = xtrans_recipe.read_text()
-          artfiles_xtrans_url = "https://artfiles.org/x.org/pub/individual/lib/xtrans-${TERMUX_PKG_VERSION}.tar.xz"
-          xtrans_mirror_url = "https://mirror.sobukus.de/files/grimoire/xorg-lib/xtrans-${TERMUX_PKG_VERSION}.tar.xz"
-          if artfiles_xtrans_url not in xtrans_source:
-              raise SystemExit("Expected xtrans artfiles URL was not found; refusing to continue with an unverified source URL.")
-          xtrans_source = xtrans_source.replace(artfiles_xtrans_url, xtrans_mirror_url, 1)
-          xtrans_recipe.write_text(xtrans_source)
-
-          print("Configured per-package X.Org source URLs with upstream SHA256 verification")
-          print(f"Applied X.Org source mirror fallback to {changed} package recipes")
+          for required_recipe in (
+              "packages/libxdmcp/build.sh",
+              "packages/xorg-util-macros/build.sh",
+              "packages/libx11/build.sh",
+              "packages/xorgproto/build.sh",
+          ):
+              recipe = Path(required_recipe)
+              content = recipe.read_text()
+              if "https://www.x.org/releases/individual/" not in content:
+                  raise SystemExit(f"X.Org primary mirror replacement did not apply to {required_recipe}")
+          print(f"Redirected {changed} X.Org recipes to the official www.x.org mirror")
           PY
 
 
