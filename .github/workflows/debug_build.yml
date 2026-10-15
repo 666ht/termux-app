@@ -25,11 +25,14 @@ jobs:
       - name: Checkout Termux app sources
         uses: actions/checkout@v6
 
+      # Pin the package recipes to the revision matching the existing ARM64 bootstrap cache.
+      # Update this SHA deliberately when refreshing the bootstrap; tracking master invalidates
+      # the exact cache key whenever upstream advances and forces a multi-hour rebuild.
       - name: Checkout Termux package build sources
         uses: actions/checkout@v6
         with:
           repository: termux/termux-packages
-          ref: master
+          ref: b654a8ce68cad3977403aa54491d2abb613d354d
           path: termux-packages
 
       - name: Get bootstrap source revision
