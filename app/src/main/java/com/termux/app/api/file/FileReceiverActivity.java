@@ -68,7 +68,7 @@ public class FileReceiverActivity extends AppCompatActivity {
      * Resolve file intents used by file managers and share sheets. Providers vary in whether
      * they put the URI in data, ClipData, EXTRA_STREAM, or an ArrayList for SEND_MULTIPLE.
      */
-    private Uri getStreamUri(Intent intent) {
+    static Uri getStreamUri(Intent intent) {
         try {
             android.os.Bundle extras = intent.getExtras();
             Object stream = extras == null ? null : extras.get(Intent.EXTRA_STREAM);
@@ -84,7 +84,7 @@ public class FileReceiverActivity extends AppCompatActivity {
         return null;
     }
 
-    private Uri getIncomingUri(Intent intent, boolean preferStream) {
+    static Uri getIncomingUri(Intent intent, boolean preferStream) {
         if (preferStream) {
             Uri streamUri = getStreamUri(intent);
             if (streamUri != null) return streamUri;
