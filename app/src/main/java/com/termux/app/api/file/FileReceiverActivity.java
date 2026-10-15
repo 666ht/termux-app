@@ -64,6 +64,59 @@ public class FileReceiverActivity extends AppCompatActivity {
             || Pattern.matches("magnet:\\?xt=urn:btih:.*?", sharedText);
     }
 
+    /**
+     * Resolve file intents used by file managers and share sheets. Providers vary in whether
+     * they put the URI in data, ClipData, EXTRA_STREAM, or an ArrayList for SEND_MULTIPLE.
+     */
+    private Uri getStreamUri(Intent intent) {
+        try {
+            android.os.Bundle extras = intent.getExtras();
+            Object stream = extras == null ? null : extras.get(Intent.EXTRA_STREAM);
+            if (stream instanceof Uri) return (Uri) stream;
+            if (stream instanceof java.util.ArrayList<?>) {
+                for (Object item : (java.util.ArrayList<?>) stream) {
+                    if (item instanceof Uri) return (Uri) item;
+                }
+            }
+        } catch (RuntimeException e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not read EXTRA_STREAM", e);
+        }
+        return null;
+    }
+
+    private Uri getIncomingUri(Intent intent, boolean preferStream) {
+        if (preferStream) {
+            Uri streamUri = getStreamUri(intent);
+            if (streamUri != null) return streamUri;
+        }
+
+        Uri dataUri = intent.getData();
+        if (dataUri != null) return dataUri;
+
+        android.content.ClipData clipData = intent.getClipData();
+        if (clipData != null) {
+            for (int i = 0; i < clipData.getItemCount(); i++) {
+                Uri clipUri = clipData.getItemAt(i).getUri();
+                if (clipUri != null) return clipUri;
+            }
+        }
+
+        return getStreamUri(intent);
+    }
+
+    private boolean startTermuxServiceSafely(Intent executeIntent) {
+        try {
+            startService(executeIntent);
+            return true;
+        } catch (RuntimeException e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not start Termux service for received file", e);
+            String message = e.getMessage();
+            showErrorDialogAndQuit("Could not open the received file in Termux" +
+                (message == null || message.isEmpty() ? "." : ":\\n\\n" + message));
+            return false;
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -85,12 +138,9 @@ public class FileReceiverActivity extends AppCompatActivity {
 
         final String sharedTitle = IntentUtils.getStringExtraIfSet(intent, Intent.EXTRA_TITLE, null);
 
-        if (Intent.ACTION_SEND.equals(action)) {
+        if (Intent.ACTION_SEND.equals(action) || Intent.ACTION_SEND_MULTIPLE.equals(action)) {
             final String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
-            Uri sharedUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-            if (sharedUri == null && intent.getClipData() != null && intent.getClipData().getItemCount() > 0) {
-                sharedUri = intent.getClipData().getItemAt(0).getUri();
-            }
+            final Uri sharedUri = getIncomingUri(intent, true);
 
             if (sharedUri != null) {
                 handleContentUri(sharedUri, sharedTitle);
@@ -107,10 +157,7 @@ public class FileReceiverActivity extends AppCompatActivity {
                 showErrorDialogAndQuit("Send action without content - nothing to save.");
             }
         } else {
-            Uri dataUri = intent.getData();
-            if (dataUri == null && intent.getClipData() != null && intent.getClipData().getItemCount() > 0) {
-                dataUri = intent.getClipData().getItemAt(0).getUri();
-            }
+            Uri dataUri = getIncomingUri(intent, false);
 
             if (dataUri == null) {
                 showErrorDialogAndQuit("Data uri not passed.");
@@ -136,8 +183,10 @@ public class FileReceiverActivity extends AppCompatActivity {
                 } catch (FileNotFoundException e) {
                     showErrorDialogAndQuit("Cannot open file: " + e.getMessage() + ".");
                 }
+            } else if ("http".equalsIgnoreCase(dataUri.getScheme()) || "https".equalsIgnoreCase(dataUri.getScheme())) {
+                handleUrlAndFinish(dataUri.toString());
             } else {
-                showErrorDialogAndQuit("Unable to receive any file or URL.");
+                showErrorDialogAndQuit("Unable to receive a file or URL with scheme: " + dataUri.getScheme());
             }
         }
         } catch (Exception e) {
@@ -220,7 +269,7 @@ public class FileReceiverActivity extends AppCompatActivity {
                 Intent executeIntent = new Intent(TERMUX_SERVICE.ACTION_SERVICE_EXECUTE, scriptUri);
                 executeIntent.setClass(FileReceiverActivity.this, TermuxService.class);
                 executeIntent.putExtra(TERMUX_SERVICE.EXTRA_ARGUMENTS, new String[]{outFile.getAbsolutePath()});
-                startService(executeIntent);
+                if (!startTermuxServiceSafely(executeIntent)) return;
                 finish();
             },
             R.string.action_file_received_open_directory, text -> {
@@ -229,7 +278,7 @@ public class FileReceiverActivity extends AppCompatActivity {
                 Intent executeIntent = new Intent(TERMUX_SERVICE.ACTION_SERVICE_EXECUTE);
                 executeIntent.putExtra(TERMUX_SERVICE.EXTRA_WORKDIR, TERMUX_RECEIVEDIR);
                 executeIntent.setClass(FileReceiverActivity.this, TermuxService.class);
-                startService(executeIntent);
+                if (!startTermuxServiceSafely(executeIntent)) return;
                 finish();
             },
             android.R.string.cancel, text -> finish(), dialog -> {
