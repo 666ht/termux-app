@@ -92,18 +92,28 @@ jobs:
               if "https://artfiles.org/x.org/pub/individual/" not in content:
                   raise SystemExit(f"X.Org mirror replacement did not apply to {required_recipe}")
 
-          # artfiles.org does not carry xorgproto 2026.1, while the upstream host has
-          # been resetting downloads on hosted runners. Use the BLFS Xorg mirror, which
-          # lists this exact archive. The original Termux package SHA256 is still verified.
+          # The mirrors above do not consistently carry the newest X.Org archives.
+          # xorgproto's canonical archive works; xtrans 1.6.0 is available from the
+          # xorg-lib mirror. Preserve the upstream SHA256 values for both downloads.
           xorgproto_recipe = Path("packages/xorgproto/build.sh")
           xorgproto_source = xorgproto_recipe.read_text()
-          artfiles_url = "https://artfiles.org/x.org/pub/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
-          mirror_url = "https://mirror.download.it/lfs/pub/blfs/svn/Xorg/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
-          if artfiles_url not in xorgproto_source:
+          artfiles_proto_url = "https://artfiles.org/x.org/pub/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
+          upstream_proto_url = "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
+          if artfiles_proto_url not in xorgproto_source:
               raise SystemExit("Expected xorgproto artfiles URL was not found; refusing to continue with an unverified source URL.")
-          xorgproto_source = xorgproto_source.replace(artfiles_url, mirror_url, 1)
+          xorgproto_source = xorgproto_source.replace(artfiles_proto_url, upstream_proto_url, 1)
           xorgproto_recipe.write_text(xorgproto_source)
-          print("Configured the verified BLFS Xorg mirror for xorgproto; package SHA256 verification remains enabled")
+
+          xtrans_recipe = Path("packages/xtrans/build.sh")
+          xtrans_source = xtrans_recipe.read_text()
+          artfiles_xtrans_url = "https://artfiles.org/x.org/pub/individual/lib/xtrans-${TERMUX_PKG_VERSION}.tar.xz"
+          xtrans_mirror_url = "https://mirror.sobukus.de/files/grimoire/xorg-lib/xtrans-${TERMUX_PKG_VERSION}.tar.xz"
+          if artfiles_xtrans_url not in xtrans_source:
+              raise SystemExit("Expected xtrans artfiles URL was not found; refusing to continue with an unverified source URL.")
+          xtrans_source = xtrans_source.replace(artfiles_xtrans_url, xtrans_mirror_url, 1)
+          xtrans_recipe.write_text(xtrans_source)
+
+          print("Configured per-package X.Org source URLs with upstream SHA256 verification")
           print(f"Applied X.Org source mirror fallback to {changed} package recipes")
           PY
 
