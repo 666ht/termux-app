@@ -92,18 +92,18 @@ jobs:
               if "https://artfiles.org/x.org/pub/individual/" not in content:
                   raise SystemExit(f"X.Org mirror replacement did not apply to {required_recipe}")
 
-          # artfiles.org does not carry xorgproto 2026.1. Keep this one package on
-          # the canonical upstream archive URL, which lists the exact tarball. Other X.Org
-          # packages retain the artfiles mirror. The package SHA256 remains authoritative.
+          # artfiles.org does not carry xorgproto 2026.1, while the upstream host has
+          # been resetting downloads on hosted runners. Use the BLFS Xorg mirror, which
+          # lists this exact archive. The original Termux package SHA256 is still verified.
           xorgproto_recipe = Path("packages/xorgproto/build.sh")
           xorgproto_source = xorgproto_recipe.read_text()
           artfiles_url = "https://artfiles.org/x.org/pub/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
-          upstream_url = "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
+          mirror_url = "https://mirror.download.it/lfs/pub/blfs/svn/Xorg/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
           if artfiles_url not in xorgproto_source:
               raise SystemExit("Expected xorgproto artfiles URL was not found; refusing to continue with an unverified source URL.")
-          xorgproto_source = xorgproto_source.replace(artfiles_url, upstream_url, 1)
+          xorgproto_source = xorgproto_source.replace(artfiles_url, mirror_url, 1)
           xorgproto_recipe.write_text(xorgproto_source)
-          print("Configured the canonical upstream archive for xorgproto; package SHA256 verification remains enabled")
+          print("Configured the verified BLFS Xorg mirror for xorgproto; package SHA256 verification remains enabled")
           print(f"Applied X.Org source mirror fallback to {changed} package recipes")
           PY
 
