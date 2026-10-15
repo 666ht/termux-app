@@ -1,5 +1,9 @@
 package com.termux.app.api.file;
 
+import android.content.ClipData;
+import android.content.Intent;
+import android.net.Uri;
+
 import com.termux.app.api.file.FileReceiverActivity;
 
 import org.junit.Assert;
@@ -31,6 +35,55 @@ public class FileReceiverActivityTest {
         for (String url : invalidUrls) {
             Assert.assertFalse(FileReceiverActivity.isSharedTextAnUrl(url));
         }
+    }
+
+
+    @Test
+    public void testIncomingUriFromIntentData() {
+        Uri uri = Uri.parse("content://example.test/files/from-data.txt");
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(uri);
+        intent.putExtra(Intent.EXTRA_STREAM, Uri.parse("content://example.test/files/from-extra.txt"));
+
+        Assert.assertEquals(uri, FileReceiverActivity.getIncomingUri(intent, false));
+    }
+
+    @Test
+    public void testIncomingUriFallsBackToStreamExtra() {
+        Uri uri = Uri.parse("content://example.test/files/from-extra.txt");
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+
+        Assert.assertEquals(uri, FileReceiverActivity.getIncomingUri(intent, false));
+    }
+
+    @Test
+    public void testIncomingUriFallsBackToClipData() {
+        Uri uri = Uri.parse("content://example.test/files/from-clip.txt");
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setClipData(new ClipData("shared-file",
+            new String[]{"application/octet-stream"}, new ClipData.Item(uri)));
+
+        Assert.assertEquals(uri, FileReceiverActivity.getIncomingUri(intent, false));
+    }
+
+    @Test
+    public void testIncomingUriHandlesSendMultipleExtra() {
+        Uri first = Uri.parse("content://example.test/files/first.txt");
+        Uri second = Uri.parse("content://example.test/files/second.txt");
+        java.util.ArrayList<Uri> items = new java.util.ArrayList<>();
+        items.add(first);
+        items.add(second);
+        Intent intent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, items);
+
+        Assert.assertEquals(first, FileReceiverActivity.getIncomingUri(intent, true));
+    }
+
+    @Test
+    public void testIncomingUriReturnsNullForEmptyIntent() {
+        Assert.assertNull(FileReceiverActivity.getIncomingUri(new Intent(Intent.ACTION_VIEW), false));
+        Assert.assertNull(FileReceiverActivity.getIncomingUri(null, false));
     }
 
 }
