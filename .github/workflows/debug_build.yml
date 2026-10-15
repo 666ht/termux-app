@@ -46,8 +46,7 @@ jobs:
         with:
           path: app/src/main/cpp/bootstrap-aarch64.zip
           key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v2
-          restore-keys: |
-            ${{ runner.os }}-bootstrap-aarch64-
+          # Do not restore a bootstrap built from a different upstream revision.
 
       - name: Build bootstrap for the coexisting package ID
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
