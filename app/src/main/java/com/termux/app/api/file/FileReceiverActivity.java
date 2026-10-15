@@ -50,6 +50,9 @@ public class FileReceiverActivity extends AppCompatActivity {
      */
     boolean mFinishOnDismissNameDialog = true;
 
+    /** Prevent the same incoming file intent from being processed again when the activity resumes. */
+    private boolean mIntentHandled;
+
     private static final String API_TAG = TermuxConstants.TERMUX_APP_NAME + "FileReceiver";
 
     private static final String LOG_TAG = "FileReceiverActivity";
@@ -65,7 +68,14 @@ public class FileReceiverActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        if (mIntentHandled) return;
+        mIntentHandled = true;
+
         final Intent intent = getIntent();
+        if (intent == null) {
+            showErrorDialogAndQuit("No incoming intent was provided.");
+            return;
+        }
         final String action = intent.getAction();
         final String type = intent.getType();
         final String scheme = intent.getScheme();
@@ -74,9 +84,12 @@ public class FileReceiverActivity extends AppCompatActivity {
 
         final String sharedTitle = IntentUtils.getStringExtraIfSet(intent, Intent.EXTRA_TITLE, null);
 
-        if (Intent.ACTION_SEND.equals(action) && type != null) {
+        if (Intent.ACTION_SEND.equals(action)) {
             final String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
-            final Uri sharedUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            Uri sharedUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (sharedUri == null && intent.getClipData() != null && intent.getClipData().getItemCount() > 0) {
+                sharedUri = intent.getClipData().getItemAt(0).getUri();
+            }
 
             if (sharedUri != null) {
                 handleContentUri(sharedUri, sharedTitle);
@@ -94,6 +107,9 @@ public class FileReceiverActivity extends AppCompatActivity {
             }
         } else {
             Uri dataUri = intent.getData();
+            if (dataUri == null && intent.getClipData() != null && intent.getClipData().getItemCount() > 0) {
+                dataUri = intent.getClipData().getItemAt(0).getUri();
+            }
 
             if (dataUri == null) {
                 showErrorDialogAndQuit("Data uri not passed.");
@@ -125,6 +141,13 @@ public class FileReceiverActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        mIntentHandled = false;
+    }
+
     void showErrorDialogAndQuit(String message) {
         mFinishOnDismissNameDialog = false;
         MessageDialogUtils.showMessage(this,
@@ -152,6 +175,7 @@ public class FileReceiverActivity extends AppCompatActivity {
             if (attachmentFileName == null) attachmentFileName = UriUtils.getUriFileBasename(uri, true);
 
             InputStream in = getContentResolver().openInputStream(uri);
+            if (in == null) throw new IOException("The content provider returned an empty input stream.");
             promptNameAndSave(in, attachmentFileName);
         } catch (Exception e) {
             showErrorDialogAndQuit("Unable to handle shared content:\n\n" + e.getMessage());
@@ -160,7 +184,15 @@ public class FileReceiverActivity extends AppCompatActivity {
     }
 
     void promptNameAndSave(final InputStream in, final String attachmentFileName) {
-        TextInputDialogUtils.textInput(this, R.string.title_file_received, attachmentFileName,
+        if (in == null) {
+            showErrorDialogAndQuit("Unable to open the selected file: no input stream was returned.");
+            return;
+        }
+
+        String safeAttachmentFileName = normalizeAttachmentFileName(attachmentFileName);
+        if (DataUtils.isNullOrEmpty(safeAttachmentFileName)) safeAttachmentFileName = "received-file";
+        final String initialFileName = safeAttachmentFileName;
+        TextInputDialogUtils.textInput(this, R.string.title_file_received, initialFileName,
             R.string.action_file_received_edit, text -> {
                 File outFile = saveStreamWithName(in, text);
                 if (outFile == null) return;
@@ -198,11 +230,22 @@ public class FileReceiverActivity extends AppCompatActivity {
             });
     }
 
+    static String normalizeAttachmentFileName(String attachmentFileName) {
+        if (attachmentFileName == null) return null;
+        String name = attachmentFileName.replace('\\', '/');
+        int separator = name.lastIndexOf('/');
+        if (separator >= 0) name = name.substring(separator + 1);
+        name = name.trim();
+        if (name.isEmpty() || ".".equals(name) || "..".equals(name)) return null;
+        return name;
+    }
+
     public File saveStreamWithName(InputStream in, String attachmentFileName) {
         File receiveDir = new File(TERMUX_RECEIVEDIR);
+        attachmentFileName = normalizeAttachmentFileName(attachmentFileName);
 
-        if (DataUtils.isNullOrEmpty(attachmentFileName)) {
-            showErrorDialogAndQuit("File name cannot be null or empty");
+        if (in == null || DataUtils.isNullOrEmpty(attachmentFileName)) {
+            showErrorDialogAndQuit("File content or file name is empty");
             return null;
         }
 
@@ -213,10 +256,10 @@ public class FileReceiverActivity extends AppCompatActivity {
 
         try {
             final File outFile = new File(receiveDir, attachmentFileName);
-            try (FileOutputStream f = new FileOutputStream(outFile)) {
+            try (InputStream input = in; FileOutputStream f = new FileOutputStream(outFile)) {
                 byte[] buffer = new byte[4096];
                 int readBytes;
-                while ((readBytes = in.read(buffer)) > 0) {
+                while ((readBytes = input.read(buffer)) > 0) {
                     f.write(buffer, 0, readBytes);
                 }
             }
