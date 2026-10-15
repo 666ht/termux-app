@@ -69,6 +69,7 @@ public class FileReceiverActivity extends AppCompatActivity {
      * they put the URI in data, ClipData, EXTRA_STREAM, or an ArrayList for SEND_MULTIPLE.
      */
     static Uri getStreamUri(Intent intent) {
+        if (intent == null) return null;
         try {
             android.os.Bundle extras = intent.getExtras();
             Object stream = extras == null ? null : extras.get(Intent.EXTRA_STREAM);
@@ -85,6 +86,7 @@ public class FileReceiverActivity extends AppCompatActivity {
     }
 
     static Uri getIncomingUri(Intent intent, boolean preferStream) {
+        if (intent == null) return null;
         if (preferStream) {
             Uri streamUri = getStreamUri(intent);
             if (streamUri != null) return streamUri;
