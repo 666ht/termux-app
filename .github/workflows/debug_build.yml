@@ -71,12 +71,14 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           path = Path("scripts/generate-bootstraps.sh")
-          source = path.read_text()
-          marker = '\\t# TODO: Remove it when Termux app supports `pacman` bootstraps installation.\\n\\tsed -e "s|@TERMUX_PREFIX@|${TERMUX_PREFIX}|g"'
-          replacement = '\\t# TODO: Remove it when Termux app supports `pacman` bootstraps installation.\\n\\tmkdir -p "${BOOTSTRAP_ROOTFS}/${TERMUX__PREFIX__PROFILE_D_DIR}"\\n\\tsed -e "s|@TERMUX_PREFIX@|${TERMUX_PREFIX}|g"'
-          if marker not in source:
-              raise SystemExit("Expected bootstrap fallback block was not found; refusing to build an incomplete bootstrap.")
-          path.write_text(source.replace(marker, replacement, 1))
+          lines = path.read_text().splitlines(keepends=True)
+          for index, line in enumerate(lines):
+              if '"$TERMUX_SCRIPTDIR/scripts/bootstrap/01-termux-bootstrap-second-stage-fallback.sh"' in line:
+                  lines.insert(index, '\tmkdir -p "${BOOTSTRAP_ROOTFS}/${TERMUX__PREFIX__PROFILE_D_DIR}"\n')
+                  break
+          else:
+              raise SystemExit("Could not find the bootstrap fallback destination; aborting.")
+          path.write_text("".join(lines))
           PY
 
           TERMUX_APP_PACKAGE_NAME_OVERRIDE=com.termux.zhcn ./scripts/generate-bootstraps.sh --architectures aarch64
