@@ -60,8 +60,8 @@ jobs:
           # dependencies. Do not use build-bootstraps.sh here: its output directory can include
           # unrelated build dependencies and produce a 100+ MB APK.
           grep -q '^TERMUX_APP__PACKAGE_NAME="com.termux"$' scripts/properties.sh
-          sed -i 's/^TERMUX_APP__PACKAGE_NAME="com.termux"$/TERMUX_APP__PACKAGE_NAME="\${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"/' scripts/properties.sh
-          grep -q '^TERMUX_APP__PACKAGE_NAME="\${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"$' scripts/properties.sh
+          sed -i 's/^TERMUX_APP__PACKAGE_NAME="com.termux"$/TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"/' scripts/properties.sh
+          grep -q '^TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"$' scripts/properties.sh
 
           # Retry transient failures from the package mirrors.
           sed -i 's/curl --fail --location/curl --retry 5 --retry-all-errors --retry-delay 2 --fail --location/g' scripts/generate-bootstraps.sh
