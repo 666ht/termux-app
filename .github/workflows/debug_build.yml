@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/src/main/cpp/bootstrap-aarch64.zip
-          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-repo-v2
+          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-repo-v3
           # Do not restore a bootstrap built from a different upstream revision.
 
       - name: Generate runtime-only ARM64 bootstrap
@@ -85,18 +85,37 @@ jobs:
           unzip -tq "$BOOTSTRAP"
           BOOTSTRAP_SIZE="$(stat -c '%s' "$BOOTSTRAP")"
           echo "Runtime-only ARM64 bootstrap size: $BOOTSTRAP_SIZE bytes"
-          if (( BOOTSTRAP_SIZE > 60000000 )); then
-            echo "ERROR: Runtime-only bootstrap exceeds 60 MB; refusing to package an oversized APK." >&2
+          if (( BOOTSTRAP_SIZE < 10000000 || BOOTSTRAP_SIZE > 60000000 )); then
+            echo "ERROR: Runtime-only bootstrap size is implausible (${BOOTSTRAP_SIZE} bytes); refusing to cache/package it." >&2
             exit 1
           fi
+          for required_path in 'bin/bash' 'bin/apt' 'bin/dpkg'; do
+            if ! unzip -Z1 "$BOOTSTRAP" | sed 's#^\./##' | grep -Fxq "$required_path"; then
+              echo "ERROR: Bootstrap is missing required runtime path: ${required_path}" >&2
+              exit 1
+            fi
+          done
           install -D -m 0644 "$BOOTSTRAP" "$GITHUB_WORKSPACE/app/src/main/cpp/bootstrap-aarch64.zip"
 
       - name: Verify ARM64 bootstrap archive
         shell: bash
         run: |
           set -euo pipefail
-          test -s app/src/main/cpp/bootstrap-aarch64.zip
-          unzip -tq app/src/main/cpp/bootstrap-aarch64.zip
+          BOOTSTRAP="app/src/main/cpp/bootstrap-aarch64.zip"
+          test -s "$BOOTSTRAP"
+          unzip -tq "$BOOTSTRAP"
+          BOOTSTRAP_SIZE="$(stat -c '%s' "$BOOTSTRAP")"
+          echo "Verified cached/generated bootstrap size: $BOOTSTRAP_SIZE bytes"
+          if (( BOOTSTRAP_SIZE < 10000000 || BOOTSTRAP_SIZE > 60000000 )); then
+            echo "ERROR: Bootstrap size is implausible; rejecting cache entry." >&2
+            exit 1
+          fi
+          for required_path in 'bin/bash' 'bin/apt' 'bin/dpkg'; do
+            if ! unzip -Z1 "$BOOTSTRAP" | sed 's#^\./##' | grep -Fxq "$required_path"; then
+              echo "ERROR: Bootstrap is missing required runtime path: ${required_path}" >&2
+              exit 1
+            fi
+          done
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
