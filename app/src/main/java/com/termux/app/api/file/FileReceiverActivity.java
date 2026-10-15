@@ -122,7 +122,6 @@ public class FileReceiverActivity extends AppCompatActivity {
             || "http".equalsIgnoreCase(scheme)
             || "https".equalsIgnoreCase(scheme);
     }
-    }
 
     private boolean startTermuxServiceSafely(Intent executeIntent) {
         try {
