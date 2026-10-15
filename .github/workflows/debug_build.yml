@@ -252,7 +252,24 @@ jobs:
           path.write_text(source)
           PY
 
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64
+          # The upstream package server occasionally resets large source downloads.
+          # Retry in the same persistent builder container so already-built packages are reused.
+          bootstrap_build_succeeded=0
+          for attempt in 1 2 3; do
+            echo "Bootstrap build attempt ${attempt}/3"
+            if ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64; then
+              bootstrap_build_succeeded=1
+              break
+            fi
+            if (( attempt < 3 )); then
+              echo "Bootstrap build failed; retrying in the same container to reuse compiled packages."
+              sleep "$((attempt * 10))"
+            fi
+          done
+          if (( bootstrap_build_succeeded != 1 )); then
+            echo "ERROR: Bootstrap build failed after 3 attempts." >&2
+            exit 1
+          fi
           test -s "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip"
 
           # Bootstrap packages may include installed test suites that are not needed at runtime.
