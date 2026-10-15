@@ -91,6 +91,19 @@ jobs:
               content = Path(required_recipe).read_text()
               if "https://artfiles.org/x.org/pub/individual/" not in content:
                   raise SystemExit(f"X.Org mirror replacement did not apply to {required_recipe}")
+
+          # artfiles.org currently returns 404 for xorgproto 2026.1.
+          # Use a second public mirror that carries this exact release; the upstream SHA256
+          # in the package recipe is still checked by the Termux package builder.
+          xorgproto_recipe = Path("packages/xorgproto/build.sh")
+          xorgproto_source = xorgproto_recipe.read_text()
+          artfiles_url = "https://artfiles.org/x.org/pub/individual/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
+          slackware_url = "https://ftp.slackware.com/pub/slackware/slackware-current/source/x/x11/src/proto/xorgproto-${TERMUX_PKG_VERSION}.tar.xz"
+          if artfiles_url not in xorgproto_source:
+              raise SystemExit("Expected xorgproto artfiles URL was not found; refusing to continue with an unverified source URL.")
+          xorgproto_source = xorgproto_source.replace(artfiles_url, slackware_url, 1)
+          xorgproto_recipe.write_text(xorgproto_source)
+          print("Configured the Slackware mirror for xorgproto; package SHA256 verification remains enabled")
           print(f"Applied X.Org source mirror fallback to {changed} package recipes")
           PY
 
