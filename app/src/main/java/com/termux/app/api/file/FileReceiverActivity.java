@@ -76,11 +76,12 @@ public class FileReceiverActivity extends AppCompatActivity {
             showErrorDialogAndQuit("No incoming intent was provided.");
             return;
         }
+        try {
         final String action = intent.getAction();
         final String type = intent.getType();
         final String scheme = intent.getScheme();
 
-        Logger.logVerbose(LOG_TAG, "Intent Received:\n" + IntentUtils.getIntentString(intent));
+        Logger.logVerbose(LOG_TAG, "Intent Received: action=" + action + ", type=" + type + ", data=" + intent.getData());
 
         final String sharedTitle = IntentUtils.getStringExtraIfSet(intent, Intent.EXTRA_TITLE, null);
 
@@ -116,9 +117,9 @@ public class FileReceiverActivity extends AppCompatActivity {
                 return;
             }
 
-            if (UriScheme.SCHEME_CONTENT.equals(scheme)) {
+            if (UriScheme.SCHEME_CONTENT.equals(dataUri.getScheme())) {
                 handleContentUri(dataUri, sharedTitle);
-            } else if (UriScheme.SCHEME_FILE.equals(scheme)) {
+            } else if (UriScheme.SCHEME_FILE.equals(dataUri.getScheme())) {
                 Logger.logVerbose(LOG_TAG, "uri: \"" + dataUri + "\", path: \"" + dataUri.getPath() + "\", fragment: \"" + dataUri.getFragment() + "\"");
 
                 // Get full path including fragment (anything after last "#")
@@ -138,6 +139,12 @@ public class FileReceiverActivity extends AppCompatActivity {
             } else {
                 showErrorDialogAndQuit("Unable to receive any file or URL.");
             }
+        }
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to handle incoming file intent", e);
+            String message = e.getMessage();
+            showErrorDialogAndQuit("Unable to open the selected file" +
+                (message == null || message.isEmpty() ? "." : ":\n\n" + message));
         }
     }
 
