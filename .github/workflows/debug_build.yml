@@ -11,10 +11,8 @@ on:
 permissions:
   contents: write
 
-# Avoid duplicate expensive bootstrap builds when several commits are pushed quickly.
-concurrency:
-  group: termux-chinese-arm64-${{ github.ref }}
-  cancel-in-progress: false
+# Intentionally no workflow-level concurrency group: each push must run independently.
+# GitHub may still wait for an available hosted runner, but newer pushes will not replace pending runs.
 
 jobs:
   build:
