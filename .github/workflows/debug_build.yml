@@ -262,11 +262,18 @@ jobs:
           if old not in source:
               raise SystemExit("Expected bootstrap output command was not found; stopping to avoid an incorrect build.")
           source = source.replace(old, new, 1)
+          # Align runtime roots with real package names and include upstream core CLI tools.
+          old_core = '\t\tPACKAGES+=("termux-core")'
+          new_core = '\t\tPACKAGES+=("curl")\n\t\tPACKAGES+=("xz-utils")\n\t\tPACKAGES+=("termux-core")'
+          if old_core not in source:
+              raise SystemExit("Expected core bootstrap package list was not found.")
+          source = source.replace(old_core, new_core, 1)
+
 
           old_extract = '\t\t# Extract all debs.\n\t\textract_debs "$TERMUX_ARCH" || return $?'
           new_extract = (
               '\t\t# Keep only bootstrap roots and their runtime dependency closure.\n'
-              '\t\tprintf "%s\\n" "${PACKAGES[@]}" "bzip2" > "$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-${TERMUX_ARCH}.txt"\n'
+              '\t\tprintf "%s\\n" "${PACKAGES[@]}" > "$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-${TERMUX_ARCH}.txt"\n'
               '\t\tpython3 "$TERMUX_PACKAGES_DIRECTORY/scripts/filter-bootstrap-runtime-debs.py" "$TERMUX_BUILT_DEBS_DIRECTORY" "$TERMUX_ARCH" "$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-${TERMUX_ARCH}.txt"\n'
               '\t\t# Extract only required runtime packages.\n'
               '\t\textract_debs "$TERMUX_ARCH" || return $?'
