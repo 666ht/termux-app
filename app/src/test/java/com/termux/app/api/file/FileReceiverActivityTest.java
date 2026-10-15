@@ -68,6 +68,26 @@ public class FileReceiverActivityTest {
     }
 
     @Test
+    public void testIncomingUriFallsBackFromUnsupportedDataToClipData() {
+        Uri uri = Uri.parse("content://example.test/files/from-clip.txt");
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(Uri.parse("unsupported-scheme://not-a-file"));
+        intent.setClipData(new ClipData("shared-file",
+            new String[]{"application/octet-stream"}, new ClipData.Item(uri)));
+
+        Assert.assertEquals(uri, FileReceiverActivity.getIncomingUri(intent, false));
+    }
+
+    @Test
+    public void testIncomingUriHandlesParcelableArrayExtra() {
+        Uri uri = Uri.parse("content://example.test/files/from-array.txt");
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.putExtra(Intent.EXTRA_STREAM, new Uri[]{uri});
+
+        Assert.assertEquals(uri, FileReceiverActivity.getIncomingUri(intent, false));
+    }
+
+    @Test
     public void testIncomingUriHandlesSendMultipleExtra() {
         Uri first = Uri.parse("content://example.test/files/first.txt");
         Uri second = Uri.parse("content://example.test/files/second.txt");

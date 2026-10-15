@@ -74,8 +74,13 @@ public class FileReceiverActivity extends AppCompatActivity {
             android.os.Bundle extras = intent.getExtras();
             Object stream = extras == null ? null : extras.get(Intent.EXTRA_STREAM);
             if (stream instanceof Uri) return (Uri) stream;
-            if (stream instanceof java.util.ArrayList<?>) {
-                for (Object item : (java.util.ArrayList<?>) stream) {
+            if (stream instanceof java.util.List<?>) {
+                for (Object item : (java.util.List<?>) stream) {
+                    if (item instanceof Uri) return (Uri) item;
+                }
+            }
+            if (stream instanceof android.os.Parcelable[]) {
+                for (android.os.Parcelable item : (android.os.Parcelable[]) stream) {
                     if (item instanceof Uri) return (Uri) item;
                 }
             }
@@ -93,17 +98,30 @@ public class FileReceiverActivity extends AppCompatActivity {
         }
 
         Uri dataUri = intent.getData();
-        if (dataUri != null) return dataUri;
+        if (isSupportedIncomingUri(dataUri)) return dataUri;
 
         android.content.ClipData clipData = intent.getClipData();
         if (clipData != null) {
             for (int i = 0; i < clipData.getItemCount(); i++) {
-                Uri clipUri = clipData.getItemAt(i).getUri();
-                if (clipUri != null) return clipUri;
+                android.content.ClipData.Item item = clipData.getItemAt(i);
+                Uri clipUri = item == null ? null : item.getUri();
+                if (isSupportedIncomingUri(clipUri)) return clipUri;
             }
         }
 
-        return getStreamUri(intent);
+        Uri streamUri = getStreamUri(intent);
+        if (isSupportedIncomingUri(streamUri)) return streamUri;
+        return dataUri != null ? dataUri : streamUri;
+    }
+
+    private static boolean isSupportedIncomingUri(Uri uri) {
+        if (uri == null) return false;
+        String scheme = uri.getScheme();
+        return UriScheme.SCHEME_CONTENT.equals(scheme)
+            || UriScheme.SCHEME_FILE.equals(scheme)
+            || "http".equalsIgnoreCase(scheme)
+            || "https".equalsIgnoreCase(scheme);
+    }
     }
 
     private boolean startTermuxServiceSafely(Intent executeIntent) {
@@ -114,7 +132,7 @@ public class FileReceiverActivity extends AppCompatActivity {
             Logger.logStackTraceWithMessage(LOG_TAG, "Could not start Termux service for received file", e);
             String message = e.getMessage();
             showErrorDialogAndQuit("Could not open the received file in Termux" +
-                (message == null || message.isEmpty() ? "." : ":\\n\\n" + message));
+                (message == null || message.isEmpty() ? "." : ":\n\n" + message));
             return false;
         }
     }
@@ -208,11 +226,17 @@ public class FileReceiverActivity extends AppCompatActivity {
 
     void showErrorDialogAndQuit(String message) {
         mFinishOnDismissNameDialog = false;
-        MessageDialogUtils.showMessage(this,
-            API_TAG, message,
-            null, (dialog, which) -> finish(),
-            null, null,
-            dialog -> finish());
+        if (isFinishing() || isDestroyed()) return;
+        try {
+            MessageDialogUtils.showMessage(this,
+                API_TAG, message,
+                null, (dialog, which) -> finish(),
+                null, null,
+                dialog -> finish());
+        } catch (RuntimeException e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not display file receiver error dialog", e);
+            finish();
+        }
     }
 
     void handleContentUri(@NonNull final Uri uri, String subjectFromIntent) {
@@ -317,12 +341,12 @@ public class FileReceiverActivity extends AppCompatActivity {
             try (InputStream input = in; FileOutputStream f = new FileOutputStream(outFile)) {
                 byte[] buffer = new byte[4096];
                 int readBytes;
-                while ((readBytes = input.read(buffer)) > 0) {
-                    f.write(buffer, 0, readBytes);
+                while ((readBytes = input.read(buffer)) != -1) {
+                    if (readBytes > 0) f.write(buffer, 0, readBytes);
                 }
             }
             return outFile;
-        } catch (IOException e) {
+        } catch (Exception e) {
             showErrorDialogAndQuit("Error saving file:\n\n" + e);
             Logger.logStackTraceWithMessage(LOG_TAG, "Error saving file", e);
             return null;
@@ -346,7 +370,7 @@ public class FileReceiverActivity extends AppCompatActivity {
         Intent executeIntent = new Intent(TERMUX_SERVICE.ACTION_SERVICE_EXECUTE, urlOpenerProgramUri);
         executeIntent.setClass(FileReceiverActivity.this, TermuxService.class);
         executeIntent.putExtra(TERMUX_SERVICE.EXTRA_ARGUMENTS, new String[]{url});
-        startService(executeIntent);
+        if (!startTermuxServiceSafely(executeIntent)) return;
         finish();
     }
 
