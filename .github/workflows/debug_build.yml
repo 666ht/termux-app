@@ -232,20 +232,19 @@ jobs:
           from pathlib import Path
           path = Path("scripts/build-bootstraps.sh")
           source = path.read_text()
-          old = 'mv -f "\${BOOTSTRAP_TMPDIR}/bootstrap-\${1}.zip" "\$TERMUX_PACKAGES_DIRECTORY/"'
-          new = 'mv -f "\${BOOTSTRAP_TMPDIR}/bootstrap-\${1}.zip" /bootstrap-output/'
+          old = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" "$TERMUX_PACKAGES_DIRECTORY/"'
+          new = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" /bootstrap-output/'
           if old not in source:
               raise SystemExit("Expected bootstrap output command was not found; stopping to avoid an incorrect build.")
           source = source.replace(old, new, 1)
 
-          old_extract = '\t\t# Extract all debs.\n\t\textract_debs "\$TERMUX_ARCH" || return \$?'
-          new_extract = (
-              '\t\t# Keep only bootstrap roots and their runtime dependency closure.\n'
-              '\t\tprintf "%s\\n" "\${PACKAGES[@]}" > "\$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-\${TERMUX_ARCH}.txt"\n'
-              '\t\tpython3 "\$TERMUX_PACKAGES_DIRECTORY/scripts/filter-bootstrap-runtime-debs.py" "\$TERMUX_BUILT_DEBS_DIRECTORY" "\$TERMUX_ARCH" "\$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-\${TERMUX_ARCH}.txt"\n'
-              '\t\t# Extract only required runtime packages.\n'
-              '\t\textract_debs "\$TERMUX_ARCH" || return \$?'
-          )
+          old_extract = """		# Extract all debs.
+		extract_debs "$TERMUX_ARCH" || return $?"""
+          new_extract = """		# Keep only bootstrap roots and their runtime dependency closure.
+		printf '%s\\n' "${PACKAGES[@]}" > "$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-${TERMUX_ARCH}.txt"
+		python3 "$TERMUX_PACKAGES_DIRECTORY/scripts/filter-bootstrap-runtime-debs.py" "$TERMUX_BUILT_DEBS_DIRECTORY" "$TERMUX_ARCH" "$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-${TERMUX_ARCH}.txt"
+		# Extract only required runtime packages.
+		extract_debs "$TERMUX_ARCH" || return $?"""
           if old_extract not in source:
               raise SystemExit("Expected bootstrap DEB extraction block was not found; stopping rather than building an oversized bootstrap.")
           source = source.replace(old_extract, new_extract, 1)
