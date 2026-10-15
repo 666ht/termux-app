@@ -45,7 +45,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/src/main/cpp/bootstrap-aarch64.zip
-          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v2
+          key: ${{ runner.os }}-bootstrap-aarch64-${{ steps.bootstrap-source.outputs.sha }}-zhcn-v3
           # Do not restore a bootstrap built from a different upstream revision.
 
       - name: Build bootstrap for the coexisting package ID
@@ -70,15 +70,186 @@ jobs:
           sed -i 's/^TERMUX_APP__PACKAGE_NAME="com.termux"$/TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"/' scripts/properties.sh
           grep -q '^TERMUX_APP__PACKAGE_NAME="${TERMUX_APP_PACKAGE_NAME_OVERRIDE:-com.termux}"$' scripts/properties.sh
 
+          cat > scripts/filter-bootstrap-runtime-debs.py <<'PY'
+          #!/usr/bin/env python3
+          """Keep only bootstrap runtime packages, excluding build-only dependency DEBs."""
+          from collections import defaultdict, deque
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          output_dir = Path(sys.argv[1])
+          target_arch = sys.argv[2]
+          roots_file = Path(sys.argv[3])
+          roots = [line.strip() for line in roots_file.read_text().splitlines() if line.strip()]
+
+          def read_control(path):
+              proc = subprocess.run(
+                  ["dpkg-deb", "-f", str(path)],
+                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+              )
+              if proc.returncode:
+                  return None
+              fields = {}
+              current = None
+              for line in proc.stdout.splitlines():
+                  if line.startswith((" ", "\t")):
+                      if current:
+                          fields[current] += " " + line.strip()
+                  else:
+                      key, sep, value = line.partition(":")
+                      if sep:
+                          current = key.strip().lower()
+                          fields[current] = value.strip()
+              return fields
+
+          def split_top_level(value, separator):
+              parts, current, depth = [], [], 0
+              for char in value:
+                  if char in "([<":
+                      depth += 1
+                  elif char in ")]>":
+                      depth = max(0, depth - 1)
+                  if char == separator and depth == 0:
+                      parts.append("".join(current).strip())
+                      current = []
+                  else:
+                      current.append(char)
+              if current:
+                  parts.append("".join(current).strip())
+              return [part for part in parts if part]
+
+          def package_name(value):
+              match = re.match(r"\s*([a-z0-9][a-z0-9+.-]*)", value, re.IGNORECASE)
+              return match.group(1) if match else None
+
+          records = []
+          by_name = defaultdict(list)
+          for path in sorted(output_dir.glob("*.deb")):
+              fields = read_control(path)
+              if not fields or not fields.get("package"):
+                  continue
+              record = {
+                  "path": path,
+                  "name": fields["package"],
+                  "arch": fields.get("architecture", "all"),
+                  "version": fields.get("version", "0"),
+                  "fields": fields,
+              }
+              records.append(record)
+              if record["arch"] in (target_arch, "all") and not record["name"].endswith("-static"):
+                  by_name[record["name"]].append(record)
+
+          if not by_name:
+              raise SystemExit(f"No compatible DEB packages found in {output_dir}")
+
+          def newer_version(left, right):
+              proc = subprocess.run(
+                  ["dpkg", "--compare-versions", left, "gt", right],
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+              )
+              return proc.returncode == 0
+
+          def choose(candidates):
+              best = candidates[0]
+              for candidate in candidates[1:]:
+                  if candidate["arch"] == target_arch and best["arch"] != target_arch:
+                      best = candidate
+                  elif candidate["arch"] == best["arch"] and newer_version(candidate["version"], best["version"]):
+                      best = candidate
+              return best
+
+          providers = defaultdict(set)
+          for name, candidates in by_name.items():
+              for record in candidates:
+                  for item in split_top_level(record["fields"].get("provides", ""), ","):
+                      provided_name = package_name(item)
+                      if provided_name:
+                          providers[provided_name].add(name)
+
+          def resolve(name):
+              if name in by_name:
+                  return choose(by_name[name])
+              for provider_name in sorted(providers.get(name, ())):
+                  if provider_name in by_name:
+                      return choose(by_name[provider_name])
+              return None
+
+          selected = {}
+          queue = deque()
+          for root in roots:
+              if not resolve(root):
+                  raise SystemExit(f"Required bootstrap package '{root}' has no compatible DEB; refusing to build an incomplete bootstrap.")
+              queue.append(root)
+
+          while queue:
+              name = queue.popleft()
+              if name in selected:
+                  continue
+              record = resolve(name)
+              if record is None:
+                  raise SystemExit(f"Runtime dependency '{name}' has no compatible DEB.")
+              selected[name] = record
+              fields = record["fields"]
+              for field in ("pre-depends", "depends"):
+                  for group in split_top_level(fields.get(field, ""), ","):
+                      resolved = None
+                      for alternative in split_top_level(group, "|"):
+                          dep_name = package_name(alternative)
+                          if dep_name:
+                              resolved = resolve(dep_name)
+                              if resolved:
+                                  break
+                      if resolved is None:
+                          raise SystemExit(
+                              f"Cannot resolve runtime dependency '{group}' required by '{name}'. "
+                              "Refusing to publish an incomplete bootstrap."
+                          )
+                      if resolved["name"] not in selected:
+                          queue.append(resolved["name"])
+
+          keep_paths = {record["path"] for record in selected.values()}
+          removed = 0
+          removed_bytes = 0
+          for record in records:
+              if record["path"] not in keep_paths:
+                  try:
+                      removed_bytes += record["path"].stat().st_size
+                      record["path"].unlink()
+                      removed += 1
+                  except FileNotFoundError:
+                      pass
+
+          print(
+              f"Runtime dependency filter: keeping {len(selected)} packages "
+              f"({', '.join(sorted(selected))}); removed {removed} unrelated/build-only DEBs "
+              f"({removed_bytes} bytes)."
+          )
+          PY
+
           python3 - <<'PY'
           from pathlib import Path
           path = Path("scripts/build-bootstraps.sh")
           source = path.read_text()
-          old = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" "$TERMUX_PACKAGES_DIRECTORY/"'
-          new = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" /bootstrap-output/'
+          old = 'mv -f "\${BOOTSTRAP_TMPDIR}/bootstrap-\${1}.zip" "\$TERMUX_PACKAGES_DIRECTORY/"'
+          new = 'mv -f "\${BOOTSTRAP_TMPDIR}/bootstrap-\${1}.zip" /bootstrap-output/'
           if old not in source:
               raise SystemExit("Expected bootstrap output command was not found; stopping to avoid an incorrect build.")
-          path.write_text(source.replace(old, new, 1))
+          source = source.replace(old, new, 1)
+
+          old_extract = '\t\t# Extract all debs.\n\t\textract_debs "\$TERMUX_ARCH" || return \$?'
+          new_extract = (
+              '\t\t# Keep only bootstrap roots and their runtime dependency closure.\n'
+              '\t\tprintf "%s\\n" "\${PACKAGES[@]}" > "\$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-\${TERMUX_ARCH}.txt"\n'
+              '\t\tpython3 "\$TERMUX_PACKAGES_DIRECTORY/scripts/filter-bootstrap-runtime-debs.py" "\$TERMUX_BUILT_DEBS_DIRECTORY" "\$TERMUX_ARCH" "\$BOOTSTRAP_TMPDIR/bootstrap-runtime-roots-\${TERMUX_ARCH}.txt"\n'
+              '\t\t# Extract only required runtime packages.\n'
+              '\t\textract_debs "\$TERMUX_ARCH" || return \$?'
+          )
+          if old_extract not in source:
+              raise SystemExit("Expected bootstrap DEB extraction block was not found; stopping rather than building an oversized bootstrap.")
+          source = source.replace(old_extract, new_extract, 1)
+          path.write_text(source)
           PY
 
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64
@@ -112,7 +283,13 @@ jobs:
           print(f"Pruned bootstrap archive size: {archive.stat().st_size} bytes")
           PY
 
-          unzip -t "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip"
+          unzip -tq "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip"
+          BOOTSTRAP_SIZE="$(stat -c '%s' "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip")"
+          echo "Runtime-only ARM64 bootstrap size: $BOOTSTRAP_SIZE bytes"
+          if (( BOOTSTRAP_SIZE > 60000000 )); then
+            echo "ERROR: Bootstrap is still unexpectedly large ($BOOTSTRAP_SIZE bytes); refusing to package it into the APK." >&2
+            exit 1
+          fi
           install -D -m 0644 "$RUNNER_TEMP/bootstrap-output/bootstrap-aarch64.zip" "$GITHUB_WORKSPACE/app/src/main/cpp/bootstrap-aarch64.zip"
 
       - name: Verify ARM64 bootstrap archive
@@ -120,7 +297,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s app/src/main/cpp/bootstrap-aarch64.zip
-          unzip -t app/src/main/cpp/bootstrap-aarch64.zip
+          unzip -tq app/src/main/cpp/bootstrap-aarch64.zip
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -165,6 +342,12 @@ jobs:
             echo "ERROR: Expected ARM64 APK was not produced: $APK_SOURCE" >&2
             echo "Actual APK outputs:" >&2
             find ./app/build/outputs/apk -type f -name '*.apk' -print >&2 || true
+            exit 1
+          fi
+          APK_SIZE_BYTES="$(stat -c '%s' "$APK_SOURCE")"
+          echo "Final ARM64 APK size: $APK_SIZE_BYTES bytes"
+          if (( APK_SIZE_BYTES > 60000000 )); then
+            echo "ERROR: Final ARM64 APK exceeds 60 MB; refusing to publish an oversized build." >&2
             exit 1
           fi
 
