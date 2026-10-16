@@ -268,12 +268,8 @@ jobs:
           if old not in source:
               raise SystemExit("Expected bootstrap output command was not found; stopping to avoid an incorrect build.")
           source = source.replace(old, new, 1)
-          # Align runtime roots with real package names and include upstream core CLI tools.
-          old_core = '\t\tPACKAGES+=("termux-core")'
-          new_core = '\t\tPACKAGES+=("curl")\n\t\tPACKAGES+=("xz-utils")\n\t\tPACKAGES+=("termux-core")'
-          if old_core not in source:
-              raise SystemExit("Expected core bootstrap package list was not found.")
-          source = source.replace(old_core, new_core, 1)
+          # Keep the upstream bootstrap package roots unchanged. curl is not a bootstrap
+          # root in this pinned Termux revision, and xz-utils is a liblzma subpackage.
 
 
           old_extract = '\t\t# Extract all debs.\n\t\textract_debs "$TERMUX_ARCH" || return $?'
